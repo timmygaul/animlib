@@ -9,6 +9,8 @@ def export(pairblend):
     # Check the node is a pairblend.
     if not is_type_exportable(cmds.nodeType(pairblend)):
         return None
+        
+    # Record the name of the pair blend attribute on the blended transform.
     
     # Return the data.
     return {'name': pairblend,}
