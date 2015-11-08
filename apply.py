@@ -7,6 +7,7 @@ import animlib.info
 import animlib.reference
 import animlib.curve
 import animlib.constraint
+import animlib.pairblend
 import pprint
 
 #======================================================================
@@ -105,7 +106,8 @@ def build(data,
     if pairblends:
         print 'Building {0} Pair Blends.'.format(len(pairblends))
         for pairblend in pairblends:
-            new_prb = animlib.pairblend.build(pairblend_data[pairblend])
+            new_prb = animlib.pairblend.build(pairblend_data[pairblend],
+                                              remap)
             remap[pairblend] = new_prb
         print
         

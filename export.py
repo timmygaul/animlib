@@ -26,11 +26,10 @@ def channels(channel_list):
      dependency_data,) = process_channels(channel_list)
      
     # Export the data for the nodes the channels are dependent upon.
-    print reference_nodes
     reference_data = process_references(reference_nodes)
     anim_curve_data = process_anim_curves(anim_curve_nodes)
     constraint_data = process_constraints(constraint_nodes)
-    pairblend_data = process_pairblends(pairblend_nodes)
+    pairblend_data = process_pairblends(pairblend_nodes, channel_data)
     
     # Export information about the 
     info_data = animlib.info.export(channels, reference_data)
@@ -109,7 +108,6 @@ def process_channels(channel_list):
         processed_channels += channel_list
         channel_list = [x for x in new_channels
                         if x not in processed_channels]
-        pprint.pprint(channel_list)
         
     # Tidy up the dependency data:
     for key in dependency_data:
@@ -190,7 +188,7 @@ def tokenise_attr(attr,
             
         # If it is an animation curve or a constraint. Replace the
         # entire name of the node, leaving only the channel name.
-        if "@CRV" in token or "@CON" in token:
+        if "@CRV" in token or "@CON" in token or "@PRB" in token:
             attr = token + attr[len(attr.split('.')[0]):]
 
     return (token, attr, node_list, processed_nodes,)
@@ -237,14 +235,19 @@ def process_constraints(constraint_nodes):
     return constraints_data
     
 #======================================================================
-def process_pairblends(pairblend_nodes):
-    """Cycles through the list of constraint nodes and gathers the data
-    needed to recreate the constraint at build time.
+def process_pairblends(pairblend_nodes, channel_data):
+    """Cycles through the list of pairBlend nodes and gathers the data
+    needed to recreate the pairBlend at build time.
     """
     pairblends_data = {}
     for token in pairblend_nodes.keys():
         pairblend_node = pairblend_nodes[token]
-        data = animlib.pairblend.export(pairblend_node)
+        try:
+            pairblend_object = channel_data[token][token+'.weight']
+        except KeyError:
+            pairblend_object = None
+        data = animlib.pairblend.export(pairblend_node,
+                                        pairblend_object)
         pairblends_data[token] = data
         
     return pairblends_data

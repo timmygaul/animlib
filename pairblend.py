@@ -3,24 +3,41 @@
 import maya.cmds as cmds
 
 #=======================================================================
-def export(pairblend):
+def export(pairblend, object):
     """Creates a dictionary of all the data necessary to rebuild the
     curve."""
     # Check the node is a pairblend.
     if not is_type_exportable(cmds.nodeType(pairblend)):
         return None
         
-    # Record the name of the pair blend attribute on the blended transform.
-    
+    # Record the name of the pair blend attribute on the blended 
+    # transform.
+    if object:
+        node, attr = object[0].split('.',1)
+    else:
+        node, attr = None
+    print {'name': pairblend, 'object': node, 'attr': attr}
     # Return the data.
-    return {'name': pairblend,}
+    return {'name': pairblend, 'object': node, 'attr': attr}
     
 #=======================================================================
-def build(data):
+def build(data, remap):
     # Create and name the anim curve.
     pairblend = cmds.createNode('pairBlend',
                                  name=data['name'],
                                  skipSelect=True)
+                                 
+    # Create the attribute to drive the pair blend weight.
+    # We need the name of the node in its tokenised form to rebuild it
+    # on whatever the hell the rig may end up being.
+    if data['object'] and data['attr']:
+        object = remap_name(data['object'], remap)
+        if cmds.objExists(object):
+            if not cmds.objExists(object+'.'+data['attr']):
+                cmds.addAttr(object,
+                             longName = data['attr'],
+                             keyable=True)
+    
     return pairblend
     
 #=======================================================================
@@ -56,3 +73,17 @@ def list_channels(pairblend):
                 '.rotateMode',
                 '.rotInterpolation',)
     return [pairblend+x for x in channels]
+    
+    
+#======================================================================
+def remap_name(name, remap):
+    """Remaps the given name if it starts with a token."""
+    old_name = name
+    if name and name.startswith("@"):
+            token = name.split('!')[0]+'!'
+            if token in remap:
+                new_value = remap[token]
+                name = new_value + name[len(token):]
+                if not cmds.objExists(name):
+                    print " > Remap failed", old_name, new_value, name
+    return name
