@@ -20,7 +20,6 @@ def export(ref_node):
     data['filename'] = cmds.referenceQuery(ref_node, filename=True)
     data['namespace'] = cmds.referenceQuery(ref_node, namespace=True)
     data['parents'] = get_parents(data['namespace'])
-    print data
     return data
     
     
@@ -54,7 +53,6 @@ def build(data, ref_namespace=None):
                          namespace=ref_namespace,
                          options= "v=0;")
     namespace = cmds.referenceQuery(filepath, namespace=True)
-    
     # Attempt to reparent anything that we can.
     set_parents(namespace, data['parents'])
     
@@ -92,15 +90,15 @@ def top_nodes(namespace):
         namespace = namespace.split(':')[1]
     else:
         namespace = namespace.split(':')[0]
-    all_nodes = cmds.ls('*{0}:*'.format(namespace),
+
+    all_nodes = set(cmds.ls('*{0}:*'.format(namespace),
                         long=True,
                         recursive=True,
-                        dagObjects=True)
-    child_nodes = cmds.ls('*{0}:*|*'.format(namespace),
-                          long=True,
-                          recursive=True,
-                          dagObjects=True)
-    return [x for x in all_nodes if x not in child_nodes]
+                        dagObjects=True))
+
+    hierarchy = '|'+namespace+':'
+    parent_nodes = [x for x in all_nodes if x.count(hierarchy) == 1]
+    return parent_nodes
     
 #======================================================================
 def get_parents(namespace):
@@ -112,6 +110,8 @@ def get_parents(namespace):
         parent = cmds.listRelatives(node, parent=True)
         if parent:
             node = node.split('|')[-1]
+            if namespace.startswith(':'):
+                namespace = namespace.split(':')[1]
             token_name = node.replace(namespace, '#nsp!')
             parent_data[token_name] = parent[0]
     return parent_data

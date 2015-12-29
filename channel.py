@@ -49,7 +49,7 @@ def get(channel):
     return(source, value, is_altered, data_type)
 
 #======================================================================
-def set(channel, channel_input, override_unaltered=False):
+def set(channel, channel_input, override_unaltered=True):
     """Receives a channel and input data gathered from the get() func.
     If there is a source attribute this function will attempt to con-
     nect it, otherwise it will apply the value (unless it is the

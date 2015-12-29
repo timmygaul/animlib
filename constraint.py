@@ -334,6 +334,9 @@ def tidy_constraint_node(constraint_node):
     
     # Create new custom weight attributes with the target names, and
     # transfer the connections.
+    if not cmds.objExists(constraint_node+'.target'):
+        print(' >>> No targets found for constraint {0}'.format(constraint_node))
+        return
     indices = cmds.getAttr(constraint_node+'.target', multiIndices=True)
     for i in indices:
         pm_attr = '.target[{0}].targetParentMatrix'.format(str(i))

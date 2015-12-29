@@ -7,6 +7,7 @@ import animlib.curve
 import animlib.constraint
 import maya.cmds as cmds
 import pprint
+import time
 
 #======================================================================
 def channels(channel_list):
@@ -57,7 +58,6 @@ def process_channels(channel_list):
                  "@CON":{},
                  "@PRB":{},}
     dependency_data = {}
-    
     processed_channels = []
     while channel_list:
         new_channels = []
@@ -183,7 +183,9 @@ def tokenise_attr(attr,
         # If the token starts with REF, the node is referenced. Replace 
         # the top level of the namespace.
         if "@REF" in token:
-            attr = token + attr[len(attr.split(':')[0]):]
+            ref_node = cmds.referenceQuery(node,referenceNode=True)
+            namespace = cmds.referenceQuery(ref_node, namespace=True)
+            attr = token + attr[len(namespace)-1:]
             
             
         # If it is an animation curve or a constraint. Replace the
@@ -201,10 +203,14 @@ def process_references(reference_nodes):
     needed to recreate the reference at build time.
     """
     reference_data = {}
+    reference_times = {}
     for reference_node in reference_nodes.keys():
+        start_time = time.time()
         token = reference_nodes[reference_node]
         data = animlib.reference.export(reference_node)
         reference_data[token] = data
+        reference_times[reference_node] = str(time.time() - start_time)
+    pprint.pprint(reference_times)
         
     return reference_data
     

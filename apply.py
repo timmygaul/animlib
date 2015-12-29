@@ -15,7 +15,8 @@ def build(data,
           reference_filter=None,
           channel_filter=None,
           reference_unfound=True,
-          reference_dependent=False):
+          reference_dependent=False,
+          force_build=False):
     """Rebuilds the given references, animation curves and constraints
     then uses the channel data to rebuild connections or set values.
     
@@ -48,22 +49,27 @@ def build(data,
     remap = {}
     scene_namespaces = ref_namespaces()
     for source_namespace in reference_filter.keys():
-        # If the namespace exists and belongs to a reference file then 
-        # add it to the remap dictionary.
         token = info_data['references'][source_namespace]['token']
         dest_namespace = reference_filter[source_namespace][0]
-        if dest_namespace in scene_namespaces:
-            remap[token] = dest_namespace
-        
-        
-        # Else if build unfound is true attempt to import the original
-        # rig and if successful remap to the resulting reference.     
-        elif reference_unfound:
+        if force_build:
             namespace = animlib.reference.build(reference_data[token],
                                          ref_namespace=dest_namespace)
             if namespace:
                 remap[token] = namespace
-    print
+        else:
+            # If the namespace exists and belongs to a reference file then 
+            # add it to the remap dictionary.
+            if dest_namespace in scene_namespaces:
+                remap[token] = dest_namespace
+            
+            
+            # Else if build unfound is true attempt to import the original
+            # rig and if successful remap to the resulting reference.     
+            elif reference_unfound:
+                namespace = animlib.reference.build(reference_data[token],
+                                             ref_namespace=dest_namespace)
+                if namespace:
+                    remap[token] = namespace
           
     # For the references that have successfully been remapped create a
     # set of curves, constraints and pair blends based on the dependency 
@@ -75,15 +81,16 @@ def build(data,
         filter = reference_filter[source_namespace][1]
         if filter == 'skip':
             continue
-        dependencies = dependency_data[reference]
-        
-        # Apply the filter to the dependent nodes to determine which
-        # should be built.
-        if filter == 'connections':
-            new += [x for x in dependencies if x.startswith('@CON')]
-            new += [x for x in dependencies if x.startswith('@PRB')]            
-        if filter in ['connections', 'anim']:
-            new +=  [x for x in dependencies if x.startswith('@CRV')]
+        if reference in dependency_data:
+            dependencies = dependency_data[reference]
+            
+            # Apply the filter to the dependent nodes to determine which
+            # should be built.
+            if filter == 'connections':
+                new += [x for x in dependencies if x.startswith('@CON')]
+                new += [x for x in dependencies if x.startswith('@PRB')]            
+            if filter in ['connections', 'anim']:
+                new +=  [x for x in dependencies if x.startswith('@CRV')]
             
     # Travel through the dependency tree to gather upstream nodes.
     processed = []
@@ -165,7 +172,7 @@ def remap_name(name, remap):
                 new_value = remap[token]
                 name = new_value + name[len(token):]
                 if not cmds.objExists(name):
-                    print " > Remap failed", old_name, new_value, name
+                    print " > Remap failed", old_name, '-', new_value, ':', name
     return name
     
 #======================================================================
