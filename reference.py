@@ -53,6 +53,17 @@ def build(data, ref_namespace=None):
                          namespace=ref_namespace,
                          options= "v=0;")
     namespace = cmds.referenceQuery(filepath, namespace=True)
+    
+    # Attempt to rename the reference node.
+    expected_name = namespace + 'RN'
+    if not cmds.objExists(expected_name):
+        ref_node = cmds.referenceQuery(filepath, referenceNode=True)
+        if not ref_node == expected_name:
+            cmds.lockNode(ref_node, lock=False )
+            ref_node = cmds.rename(ref_node, expected_name)
+            cmds.lockNode(ref_node)
+
+
     # Attempt to reparent anything that we can.
     set_parents(namespace, data['parents'])
     
@@ -129,7 +140,12 @@ def set_parents(namespace, parent_data):
             print '  >> Could not find parent node: ',
             print rig_obj, parent_data[key]
             continue
-        cmds.parent(rig_obj, parent_data[key])
+            
+        try:
+            cmds.parent(rig_obj, parent_data[key])
+        except:
+            print '  >> Reparenting failed: '
+            print rig_obj, parent_data[key]
     
 #======================================================================
 def trim_namespace(namespace):

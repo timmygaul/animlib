@@ -3,7 +3,7 @@ import pprint
 import animlib.curve as crv
 
 #=======================================================================
-def curve(anim_curve, time_filter, skip_cycle=True):
+def curve(anim_curve, time_filter, skip_cycle=True, trim=False):
 
     if not cmds.objExists(anim_curve):
         print "Could not find {0}".format(anim_curve)
@@ -15,38 +15,42 @@ def curve(anim_curve, time_filter, skip_cycle=True):
         print 'Skipping non-time-based curve {0}'.format(anim_curve)
         return anim_curve
 
-    # If the time filter is a single value pair we calculate the offset
-    # and apply it to the entire framerange and return the anim_curve.
-    if len(time_filter) == 1:
-        offset = time_filter[0][0] - time_filter[0][1]
-        src_keys = cmds.keyframe(anim_curve, query=True)
-        new_start = min(src_keys)+offset
-        new_end = max(src_keys)+offset
-        cmds.scaleKey(anim_curve,
-                      time=(min(src_keys),max(src_keys)),
-                      newStartTime=new_start,
-                      newEndTime=new_end,)
-        return anim_curve
-
-    # If there are only two values then it is a simple scale. Calculate
-    # the scale and apply it to the entire key range. If it is a held
-    # frame then treat it as a complex retime.
-    if len(time_filter) == 2:
-        new_start, src_start = time_filter[0]
-        new_end, src_end = time_filter[1]
-        if src_start != src_end:
-            scale = (float(new_end) - new_start)/(src_end-src_start)
-            offset = new_start-(src_start*scale)
+    # If a trim hasn't been specified then treat simple retimes as
+    # global offsets or scales.
+    if not trim:
+        # If the time filter is a single value pair we calculate the 
+        # offset and apply it to the entire framerange and return the 
+        # anim_curve.
+        if len(time_filter) == 1:
+            offset = time_filter[0][0] - time_filter[0][1]
             src_keys = cmds.keyframe(anim_curve, query=True)
-            if not src_keys:
-                cmds.select(anim_curve)
-            new_start = min(src_keys)*scale+offset
-            new_end = max(src_keys)*scale+offset
+            new_start = min(src_keys)+offset
+            new_end = max(src_keys)+offset
             cmds.scaleKey(anim_curve,
                           time=(min(src_keys),max(src_keys)),
                           newStartTime=new_start,
                           newEndTime=new_end,)
             return anim_curve
+    
+        # If there are only two values then it is a simple scale. 
+        # Calculate the scale and apply it to the entire key range. If 
+        # it is a held frame then treat it as a complex retime.
+        if len(time_filter) == 2:
+            new_start, src_start = time_filter[0]
+            new_end, src_end = time_filter[1]
+            if src_start != src_end:
+                scale = (float(new_end) - new_start)/(src_end-src_start)
+                offset = new_start-(src_start*scale)
+                src_keys = cmds.keyframe(anim_curve, query=True)
+                if not src_keys:
+                    cmds.select(anim_curve)
+                new_start = min(src_keys)*scale+offset
+                new_end = max(src_keys)*scale+offset
+                cmds.scaleKey(anim_curve,
+                              time=(min(src_keys),max(src_keys)),
+                              newStartTime=new_start,
+                              newEndTime=new_end,)
+                return anim_curve
             
 
     # If the curve has a cycle on it then a complex retime will be

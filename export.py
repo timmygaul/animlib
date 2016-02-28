@@ -185,7 +185,7 @@ def tokenise_attr(attr,
         if "@REF" in token:
             ref_node = cmds.referenceQuery(node,referenceNode=True)
             namespace = cmds.referenceQuery(ref_node, namespace=True)
-            attr = token + attr[len(namespace)-1:]
+            attr = attr.replace(namespace[1:], token)
             
             
         # If it is an animation curve or a constraint. Replace the

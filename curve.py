@@ -90,9 +90,10 @@ def add_keyframe(anim_curve, key_data):
         # Before we adjust any tangents ensure the weight tangents 
         # setting is correct.
         if 'tan_weighted' in key_data:
-            cmds.keyTangent(anim_curve,
-                            edit=True,
-                            weightedTangents=True,)
+            if key_data['tan_weighted']:
+                cmds.keyTangent(anim_curve,
+                                edit=True,
+                                weightedTangents=True,)
                         
         # Set the tangents weights and angles. This will set the type to
         # 'fixed'.
