@@ -142,7 +142,9 @@ def tokenise_attr(attr,
         # If the node is referenced create a 'REF#' token and add the  
         # node to the anim curve node dictionary.
         if cmds.referenceQuery(node, isNodeReferenced=True):
-            ref_node = cmds.referenceQuery(node,referenceNode=True)
+            ref_node = cmds.referenceQuery(node,
+                                           referenceNode=True,
+                                           topReference=True)
             if ref_node in node_list['@REF']:
                 token = node_list['@REF'][ref_node]
             else:
@@ -183,10 +185,11 @@ def tokenise_attr(attr,
         # If the token starts with REF, the node is referenced. Replace 
         # the top level of the namespace.
         if "@REF" in token:
-            ref_node = cmds.referenceQuery(node,referenceNode=True)
+            ref_node = cmds.referenceQuery(node,
+                                           referenceNode=True,
+                                           topReference=True)
             namespace = cmds.referenceQuery(ref_node, namespace=True)
             attr = attr.replace(namespace[1:], token)
-            
             
         # If it is an animation curve or a constraint. Replace the
         # entire name of the node, leaving only the channel name.
@@ -251,7 +254,7 @@ def process_pairblends(pairblend_nodes, channel_data):
         try:
             pairblend_object = channel_data[token][token+'.weight']
         except KeyError:
-            pairblend_object = None
+            continue
         data = animlib.pairblend.export(pairblend_node,
                                         pairblend_object)
         pairblends_data[token] = data

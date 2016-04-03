@@ -40,7 +40,7 @@ def build(data,
     #=== BUILD REFRENCES ===============================================
     # If there is no reference filter then populate a default filter 
     # with all namespaces, attempting to use source namespaces and to
-    # build all connections.
+    # build all inputs.
     if not reference_filter:
         reference_filter = {}
         for reference in reference_data.keys():
@@ -52,6 +52,7 @@ def build(data,
     # reference filter.
     print 'Processing {0} References.'.format(len(reference_filter))
     remap = {}
+    token_mode = {}
     scene_namespaces = ref_namespaces()
     for source_namespace in reference_filter.keys():
         token = info_data['references'][source_namespace]['token']
@@ -76,6 +77,7 @@ def build(data,
                                         ref_namespace=dest_namespace)
                 if namespace:
                     remap[token] = namespace
+        token_mode[token] = reference_filter[source_namespace][1]
           
     #=== BUILD DEPENDENT NODES =========================================
     # For the references that have successfully been remapped create a
@@ -92,10 +94,15 @@ def build(data,
             # Apply the filter to the dependent nodes to determine which
             # should be built.
             dependencies = dependency_data[reference]
-            if filter == 'connections':
-                new += [x for x in dependencies if x.startswith('@CON')]
-                new += [x for x in dependencies if x.startswith('@PRB')]            
-            if filter in ['connections', 'anim']:
+            if filter in ['connections', 'constraints']:
+                nodes = []
+                nodes+=[x for x in dependencies if x.startswith('@CON')]
+                nodes+=[x for x in dependencies if x.startswith('@PRB')]
+                new += nodes
+                if filter == 'constraints':
+                    for node in nodes:
+                        token_mode[node]='constraints'
+            if filter in ['connections', 'curves']:
                 new +=  [x for x in dependencies if x.startswith('@CRV')]
                 
             
@@ -147,24 +154,53 @@ def build(data,
                 new_curve = animlib.retime.curve(new_curve, 
                                                  retime_filter)
     
+    print token_mode
+    
     # === CONNECT NODES / APPLY VALUES ON CHANNELS =====================
     # Apply the channel data.
     if channel_data:
+        # Report the number of channels
         i = 0
         for token in channel_data:
             i += len(channel_data[token])
         print 'Applying data to {0} channels.'.format(i)
+        
+        # Process the channels by the token they belong to.
         for token in channel_data:
+        
+            # Figure out what data we're applying. If the mode is skip
+            # or pass, we don't want to apply any data. If the mode is
+            # constraints, we only want to do connections that start or
+            # end in a pair blend or constraint. If the mode is 'curves'
+            # 
+            apply_mode = 'all'
+            if token in token_mode:
+                apply_mode = token_mode[token]
+                if apply_mode in ['skip', 'pass']:
+                    continue
             for channel in channel_data[token].keys():
                 data = channel_data[token][channel]
+                if apply_mode == 'values':
+                    data = (None, data[1], data[2], data[3])
+                elif apply_mode == 'constraints':
+                    print '$$$'+str(data[0])
+                    if data[0] and '@CRV' in data[0]:
+                        data = (None, data[1], data[2], data[3])
+                    else:
+                        data = (remap_name(data[0], remap),
+                                data[1], data[2], data[3])
+                else:
+                    data = (remap_name(data[0], remap),
+                            data[1], data[2], data[3])
+                        
+                        
+                # Apply the channel data.
                 channel = remap_name(channel, remap)
-                data = remap_name(data[0], remap), data[1], data[2], data[3]
                 if '@' in channel:
                     continue
-                
-                # Apply the channel data.
                 animlib.channel.set(channel,
                                     data,
+                                    skip_connected=False,
                                     blend_filter = anim_blend_filter)
         print
             

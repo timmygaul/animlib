@@ -103,11 +103,11 @@ def set(channel,
     if cmds.connectionInfo(channel, isDestination=True):
         if skip_connected:
             return channel
-        connection = cmds.listConnections(channel,
+        connections = cmds.listConnections(channel,
                                           source=True,
-                                          destination=False)[0]
-    else:
-        connection = None
+                                          destination=False)
+        if connections:
+            connection = connections[0]
         
     # If the channel has a source attribute apply it.
     if source:

@@ -1,6 +1,7 @@
 """Creates a Maya user interface for the animlib toolset."""
 
 import maya.cmds as cmds
+import re
 import animlib.defaults
 import animlib.file
 import animlib.apply
@@ -12,7 +13,7 @@ def build():
     # Create the window.
     if cmds.window("animlib_ui", exists=True):
         cmds.deleteUI("animlib_ui")
-    window = cmds.window("animlib_ui", width=500, title="Animlib UI")
+    window = cmds.window("animlib_ui", title="Animlib UI")
     
     # Create layouts.
     form = cmds.formLayout('animlib_form', numberOfDivisions=100)
@@ -111,9 +112,9 @@ def build():
         cmds.deleteUI('animlib_ui_dock')
     cmds.dockControl('animlib_ui_dock',
                      label = 'Animlib UI',
-                     area='right',
-                     content=window,
+                     area='left',
                      width=427,
+                     content=window,
                      allowedArea=['right', 'left'] )
     file_update('')
                      
@@ -126,14 +127,14 @@ def file_update(filepath):
     except:
         cmds.textField('animlib_filepath',
                         edit=True,
-                       backgroundColor=[0.2,0,0],
+                       backgroundColor=[0.8,0.4,0.4],
                        enableBackground = True)
         cmds.textField('animlib_date', edit=True, text='')
         populate_ref_remap([])
         return
     cmds.textField('animlib_filepath',
                     edit=True,
-                       backgroundColor=[0.15,0.2,0.15],
+                       backgroundColor=[0.4,0.8,0.4],
                        enableBackground = True)
     (info_data,
      dependency_data,
@@ -151,9 +152,129 @@ def file_update(filepath):
     if 'references' in info_data:
         populate_ref_remap(info_data['references'].keys())
         
+    
+#======================================================================
+def ref_menu_item(nsp, new_nsp):
+    print ('Menu item update received: '+nsp+' - '+new_nsp)
+    if new_nsp == 'Custom...':
+        cmds.setFocus('animlib_ref_'+nsp+'_txt')
+        return
+    if new_nsp == 'Default':
+        cmds.textField('animlib_ref_'+nsp+'_txt',
+                       edit=True,
+                       text = nsp)
+    else:
+        cmds.textField('animlib_ref_'+nsp+'_txt',
+                       edit=True,
+                       text = new_nsp)
+    ref_update(None)
         
+    
+#======================================================================
+def ref_menu_update(value):
+    cmds.popupMenu('animlib_ref_'+value+'_menu',
+                   edit=True,
+                   deleteAllItems=True)
+        
+    cmds.menuItem(label='None',         
+                  parent='animlib_ref_'+value+'_menu',
+                  command=lambda x, y=value, z='':ref_menu_item(y, z),)
+    cmds.menuItem(label='Custom',         
+                  parent='animlib_ref_'+value+'_menu',
+                  command=lambda x, y=value, z='Custom...':ref_menu_item(y, z),)
+        
+    cmds.menuItem(label='Default',         
+                  parent='animlib_ref_'+value+'_menu',
+                  command=lambda x, y=value, z='Default':ref_menu_item(y, z),)
+    scn_nsps = all_ref_namespaces()
+    cmds.menuItem(label='-----------------------',         
+                  parent='animlib_ref_'+value+'_menu',
+                  command=lambda x, y=value, z='':ref_menu_item(y, z),)
+    if scn_nsps:
+        scn_nsps.sort()
+        for scn_nsp in scn_nsps:      
+            if not scn_nsp.startswith(':'):
+                scn_nsp = ':' + scn_nsp
+            cmds.menuItem(label=scn_nsp,         
+                          parent='animlib_ref_'+value+'_menu',
+                          command=lambda x, y=value, z=scn_nsp:ref_menu_item(y, z),)
+        
+    else:
+        cmds.menuItem(label='No referenced rigs found',         
+                      parent='animlib_ref_'+value+'_menu',
+                      enable=False)
+
+#======================================================================
+def ref_mode_update(*args):
+    print args
+    
+#======================================================================
+def ref_update(value):
+    build_colour = [0.4,0.8,0.4]
+    apply_colour = [0.3,0.55,1]
+    skip_colour = [0.8,0.4,0.4]
+    force_build_state = cmds.radioButton('animlib_force_build',
+                                      query=True,
+                                      select=True)
+    build_unfound_state = cmds.radioButton('animlib_build_unfound',
+                                      query=True,
+                                      select=True)
+                                      
+                                      
+    namespaces = cmds.text('animlib_ref_nsp_list', query=True,
+                         label=True).split('#')
+    for namespace in namespaces:
+        if namespace:
+            field = 'animlib_ref_'+namespace+'_txt'
+            
+            new_nsp = cmds.textField(field,
+                                     query=True,
+                                     text=True)    
+                                         
+            if not new_nsp.startswith(':'):
+                new_nsp = ':' + new_nsp
+                cmds.textField(field,
+                               edit=True,
+                               text = new_nsp)
+                               
+            if new_nsp==':':
+                cmds.textField(field,
+                               edit=True,
+                               text = '',
+                               backgroundColor = skip_colour)
+                continue
+            
+            if force_build_state:      
+                cmds.textField(field,
+                               edit=True,
+                               backgroundColor = build_colour)
+                continue
+                    
+                
+            if cmds.namespace(exists=new_nsp):
+                cmds.textField(field,
+                               edit=True,
+                               backgroundColor = apply_colour)
+                continue
+                
+            if build_unfound_state:
+                cmds.textField(field,
+                               edit=True,
+                               backgroundColor = build_colour)
+                continue
+                
+            cmds.textField(field,
+                           edit=True,
+                           backgroundColor = skip_colour)
+        
+    
 #======================================================================
 def populate_ref_remap(namespaces):
+    radio_state = None
+    if cmds.radioCollection('animlib_ref_radio', query=True, exists=True):
+        radio_state = cmds.radioCollection('animlib_ref_radio', 
+                                            query=True, select=True)
+                                            
     if cmds.columnLayout('animlib_ref_col', exists=True):
         cmds.deleteUI('animlib_ref_col')
     ref_col = cmds.columnLayout('animlib_ref_col',
@@ -164,30 +285,81 @@ def populate_ref_remap(namespaces):
         cmds.setParent('animlib_ref_col')
         
         nsp_form = cmds.formLayout('animlib_ref_'+namespace+'_frm',
-                                   numberOfDivisions=100)
-        lbl_nsp = cmds.text(label=namespace, height=20, align='right')
+                                   numberOfDivisions=100,
+                                   width=420)
+        lbl_nsp = cmds.text(label=namespace+'  > ', height=20, align='right')
+        cmd = '"{0}"'.format(namespace)
         txt_nsp = cmds.textField('animlib_ref_'+namespace+'_txt',
                                   editable=True,
-                                  text=namespace)
+                                  text=namespace,
+                                  placeholderText='None',
+                                  changeCommand=lambda x, y=namespace:ref_update(y),
+                                  enterCommand=lambda x, y=namespace:ref_update(y),
+                                  receiveFocusCommand=lambda x, y=namespace:ref_update(y),)
+        cmds.popupMenu('animlib_ref_'+namespace+'_menu',
+                       postMenuCommand=lambda x, y, z=namespace:ref_menu_update(z),
+                )
+        
+
+        mnu_mod = cmds.optionMenu('animlib_ref_'+namespace+'_mode',
+                                  changeCommand=lambda x, y=namespace:ref_mode_update(x,y) )
+        cmds.menuItem( label='All Inputs' )
+        cmds.menuItem( label='Values' )
+        cmds.menuItem( label='Curves/Values' )
+        cmds.menuItem( label='Constraints' )
+        cmds.menuItem( label='No Inputs' )
         cmds.formLayout(nsp_form,
                         edit=True,
                         attachForm=[(lbl_nsp, 'top', 3),
-                                    (txt_nsp, 'right', 5),
+                                    (mnu_mod, 'top', 3),
+                                    (mnu_mod, 'right', 5),
+                                    (txt_nsp, 'right', 120),
                                     (txt_nsp, 'top', 3),],
+                        attachControl=[
+                                    (mnu_mod, 'left', 5, txt_nsp),],
                         attachPosition=[(txt_nsp, 'left', 0, 33),
                                         (lbl_nsp, 'right', 5, 33)],) 
-    nsp_form = cmds.formLayout('animlib_ref_checkbox_frm',
+    nsp_form = cmds.formLayout('animlib_ref_radioButton_frm',
                                    numberOfDivisions=100,
                   parent=ref_col)   
-    cbx = cmds.checkBox('animlib_force_build',
-                        label='Build Next Available Namespace',)
+    sep = cmds.separator( height=10, style='in' )
+    lbl_nsp = cmds.text(label='Bring new referenced rigs into the scene:', height=20, align='right')
+    radcol = cmds.radioCollection('animlib_ref_radio')
+    rad1 = cmds.radioButton('animlib_build_unfound',
+                        label='If the rig\'s namespace does not exist yet',
+                        collection = radcol)
+    rad2 = cmds.radioButton('animlib_force_build',
+                        label='Whether the namespace exists or not',
+                        collection = radcol,)
+    rad3 = cmds.radioButton('animlib_no_new',
+                        label='Never, only apply to existing namespaces',
+                        collection = radcol,)
+    nsp_list = cmds.text('animlib_ref_nsp_list',
+                         label='#'.join(namespaces), visible=False)
     cmds.formLayout(nsp_form,
                     edit=True,
-                    attachForm=[(cbx, 'top', 5),
-                                (cbx, 'bottom', 5),],
-                    attachPosition=[(cbx, 'left', 0, 33),],) 
-                  
-                        
+                    attachForm=[(sep, 'top', 3),
+                                (sep, 'left', 3),
+                                (sep, 'right', 3),
+                                (lbl_nsp, 'top', 10),
+                                (rad3, 'bottom', 5),],
+                    attachControl=[(rad1, 'top', 5, lbl_nsp,),
+                                   (rad2, 'top', 5, rad1),
+                                   (rad3, 'top', 5, rad2),],
+                    attachPosition=[(lbl_nsp, 'left', -80, 33),
+                                    (rad1, 'left', 0, 33),
+                                    (rad2, 'left', 0, 33),
+                                    (rad3, 'left', 0, 33),],) 
+    if radio_state and cmds.radioButton(radio_state, query=True, exists=True):
+        cmds.radioButton(radio_state, edit=True, select=True)
+    else:
+        cmds.radioButton('animlib_build_unfound',
+                        edit=True,
+                        select=True)
+    for rad in (rad1, rad2, rad3):
+        cmds.radioButton(rad, edit=True, changeCommand = lambda x, y=None:ref_update(y),)
+    ref_update(None)
+                   
 #======================================================================
 def read_ref_map(namespaces):
     remap = {}
@@ -197,21 +369,23 @@ def read_ref_map(namespaces):
                               text=True)
         if not text.startswith(':'):
             text = ':' + text
-        remap[namespace] = (text, 'connections')
-        
+            remap[namespace] = (namespace, 'skip')
+        if text != ':':
+            mode = cmds.optionMenu('animlib_ref_'+namespace+'_mode',
+                                   query=True,
+                                   value=True)
+            mode_convert = {'No Inputs': 'pass',
+                            'Values': 'values',
+                            'Curves/Values': 'curves',
+                            'Constraints': 'constraints',
+                            'All Inputs': 'connections'}
+            remap[namespace] = (text, mode_convert[mode])
     return remap
                         
                         
 #======================================================================
 def check_ref_map(input):
     remap = {}
-    for namespace in namespaces:
-        text = cmds.textField('animlib_ref_'+namespace+'_txt',
-                              query=True,
-                              text=True)
-        if not text.startswith(':'):
-            text = ':' + text
-        remap[namespace] = (text, 'connections')
         
     return remap
                         
@@ -228,14 +402,22 @@ def apply_file(input):
      constraint_data,
      pairblend_data,
      channel_data,) = data
-    if 'references' in info_data:
+    if 'references' in info_data.keys():
         reference_remap = read_ref_map(info_data['references'].keys())
     else:
         reference_remap = None
-    force_build_state = cmds.checkBox('animlib_force_build', query=True, value=True)
+    print '!!!!!'+str(reference_remap)
+    force_build_state = cmds.radioButton('animlib_force_build',         
+                                         query=True,
+                                         select=True)
+    build_unfound = cmds.radioButton('animlib_build_unfound',         
+                                         query=True,
+                                         select=True)
     result = animlib.apply.build(data,
                                  force_build=force_build_state,
-                                 reference_filter=reference_remap)
+                                 reference_filter=reference_remap,
+                                 reference_unfound=build_unfound)
+    ref_update(None)
     
 #======================================================================
 def open_file(input):
@@ -250,3 +432,17 @@ def open_file(input):
                     edit=True,
                     text=str(new_path))
     file_update(new_path)
+    
+    
+    
+    
+#=======
+def all_ref_namespaces():
+    all_refs = cmds.file(query=True, list=True)
+    ref_re = re.compile(r'[a-zA-Z0-9._\-:/\\]*\.(ma|mb)(\{\d\})?')
+    file_refs = [x for x in all_refs if re.match( ref_re, x)]
+    #! Need to let this account for numbered references
+    namespaces = [cmds.file(x, query=True, namespace=True) for x in file_refs]
+    return namespaces
+    
+    
